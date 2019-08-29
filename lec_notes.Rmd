@@ -1,0 +1,204 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# lec04 - Hypothesis testing
+## Simulating data
+Often we won't have the expected data, so we must simulate the data manually.
+Firstly it it important to identify the null and alternative hypotheses, that way we know what we are measuring and what our expected data should look like.
+
+```{r data_sim}
+# observed counts
+y = c(128, 86, 74,112)
+n = sum(y)
+
+#hypothesized proportions
+p = c(.25, .25, .25, .25)
+
+#expected counts
+e = p*n
+
+#Lets visualise the two.
+
+names = c("C1", "C2", "C3", "C4")
+par(mfrow = c(1,2), cex=1.5)
+barplot(y, names.arg = names,
+        main="Observed counts")
+barplot(e, names.arg=names,
+        main="Expected counts")
+
+```
+Intuitively the above plots do not look like a great fit, however scientific studies rely on rigor not intuition. So we will apply a test statistic to see. But first, we can do a couple of checks.
+
+```{r}
+library(tidyverse)
+df = tibble(names,y,p,e)
+df %>% ggplot() + aes(x=names,y=y)+
+  geom_bar(stat="identity") + 
+  geom_hline(yintercept=100, colour="blue") +
+  theme_minimal(base_size=32) + 
+  labs(x="",y="Count")
+d = y-e
+sprintf("The differences are:")
+print(d)
+sprintf("and the mean of the differences is %f", mean(d))
+```
+
+But this is still not very rigorous and the plot doesn't give us enough information. So we will measure the similarity using a test statistic.
+```{r}
+t0 = sum((y-e)^2/e)
+sprintf("The sum of squared differences normalised, equals: %f", t0)
+
+sprintf("Under the null hypothesis, the counts are uniformly distributed across 4 categories. Running a simulation to generate a random even distribution with 400 samples, results in:")
+n = 400
+set.seed(1)
+sim1 = sample(x=names, size=n, replace=TRUE, prob = e)
+sim_y = table(sim1)
+par(cex=2)
+barplot(sim_y, main="Simulated counts")
+
+```
+Applying our test statistic to the above simulation yields the result:
+
+```{r}
+sum((sim_y-e)^2/e)
+
+```
+We can see that there is a significant difference between 6.26 and 18. However there could be alot of variance, so to ensure robustness, we should run the simulation a number of times.
+```{r multi_sim}
+runs = 3000
+sim_test_stats = vector(mode="numeric", length=runs)
+for(i in 1:runs){
+  sim = table(sample(x=names, size=n, replace=TRUE,prob=e))
+  sim_test_stats[i]=sum((sim-e)^2/e)
+}
+par(cex=2, mar=c(4,4,0.5,0.5))
+hist(sim_test_stats, main="", breaks=20)
+
+```
+Now we can see the shape of the distribution **of the test statistic ** when the null hypothesis is true.
+### Question: Given the null hypothesis is true, how **likely** are we to get the observed test statistic, or a more extreme value.
+```{r}
+sprintf("Likelihood %f percent", mean(sim_test_stats >= t0))
+```
+However there is a much simpler way of doing this using the "infer" package (see lecture slides)
+BUT we can also do this without simulations. This can be done using the chi squared test.
+
+```{r long_form_infer}
+library(infer)
+df_long = df %>% select(names, y) %>% uncount(weights=y)
+probs = c("C1"=.25, "C2"=.25, "C3"=.25, "C4"=.25)
+sim_study = df_long %>% specify(response=names) %>% hypothesize(null="point",p=probs) %>% generate(reps=3000,type="simulate") %>% calculate(stat="Chisq")
+glimpse(sim_study)
+```
+
+```{r plot_chisq}
+sim_study %>% ggplot(aes(x=stat)) + geom_histogram(boundary=0) + theme_minimal(base_size=32) + geom_vline(xintercept=t0, colour="red", size=3)+ labs(x="Test statistic", y="Count")
+
+```
+```{r alt_way_wout_sims}
+sim_study %>% ggplot(aes(x=stat)) + geom_histogram(aes(y=..density..), boundary=0) + theme_minimal(base_size=32)+geom_vline(xintercept = t0,colour="red", size=2) + labs(x="Test statistic", y="Density") + stat_function(fun=dchisq, args=list(df=3), colour="blue", size=2)
+```
+
+## Lets test the linkage model
+The linkage model hypothesizes the proportion of the data differently, suggesting not all are equal. So lets test that.
+
+```{r}
+link_sample = c(128,86,74,112)
+p = (86+74)/sum(link_sample)
+e_prop = c(.5*(1-p),.5*p, .5*p, .5*(1-p))
+e_val = e_prop*sum(link_sample)
+print(p)
+print(e)
+
+names = c("C1", "C2", "C3", "C4")
+par(mfrow=c(1,2), cex=1.5) #sets up graphics with 1 row and 2 cols
+barplot(link_sample, names.arg = names, main="Sample linkage")
+barplot(e_val, names.arg = names, main="expected linkage")
+```
+
+```{r}
+#Now lets use our dope modelling skills to see if this has a better outcome.
+df_link <- tibble("names"=names, "y"=link_sample, "p"=e_prop, "e"=e_val)
+glimpse(df_link)
+df_link_long = df_link %>% select(names, y) %>% uncount(weights=y)
+probs = c("C1"=e_prop[1], "C2"=e_prop[2], "C3"=e_prop[3], "C4"=e_prop[4])
+print(probs)
+
+sim_study = df_link_long %>% specify(response=names) %>% hypothesize(null="point",p=probs) %>% generate(reps=3000,type="simulate") %>% calculate(stat="Chisq")
+glimpse(sim_study)
+
+```
+
+# Lec05 - Measuring the error of a study.
+The below calculations look at using bayes formula to measure the probability that a positive result is actually a positive result.
+```{r general_population}
+#NIPT
+gen_pop <- data.frame(matrix(c(94, 18, 417, 99471), ncol=4, byrow=TRUE))
+colnames(gen_pop) <- c("FP", "FN","TP", "TN")
+#rownames(gen_pop) <- c()
+gen_pop
+
+
+sensitivity = gen_pop[1,"TP"]/(gen_pop[1,"TP"]+gen_pop[1,"FN"]) #P(S+|D+)
+specificity = gen_pop[1,"TN"]/(gen_pop[1,"TN"]+gen_pop[1,"FP"]) #P(S-|D-)
+prevalence = (gen_pop[1,"TP"]+gen_pop[1,"FN"])/100000
+print(sensitivity)
+print(specificity)
+print(prevalence)
+
+prob = (sensitivity*prevalence)/(sensitivity*prevalence +  (1-specificity)*(1-prevalence))
+print(prob)
+
+```
+
+``` {r sample}
+sample_data = data.frame(matrix(c(324, 31, 9636, 9), ncol=4, byrow=TRUE))
+colnames(sample_data) <- c("TP", "FP", "TN", "FN")
+
+sample_data
+
+sample_sens = sample_data[1,"TP"]/(sample_data[1,"TP"]+sample_data[1,"FN"])
+sample_spec = sample_data[1,"TN"]/(sample_data[1,"TN"]+sample_data[1,"FP"])
+sample_prev= (sample_data[1,"TP"]+sample_data[1,"FN"])/10000
+
+print(sample_sens)
+print(sample_spec)
+print(sample_prev)
+
+prob_sample = 
+```
+
+
+```{r cluster}
+data(kyphosis, package="rpart")
+dplyr::glimpse(kyphosis)
+
+```
+
+```{r}
+truth = kyphosis$Kyphosis
+pred = ifelse(kyphosis$Start>= 9, "Predict absent", "Predict present")
+t = table(pred, truth)
+t
+```
+
+
+```{r}
+sens = t[4]/(t[3]+t[4]) 
+spec = t[1]/(t[1]+t[2])
+prev = (t[3]+t[4])/sum(t)
+
+pos_pred_val = (sens*prev)/(sens*prev+spec*(1-prev))
+print(pos_pred_val)
+neg_pred_val = 1-pos_pred_val
+sprintf("The results indicate a sensitivity of %f. a specificity of %f which derives a negative prediction value of %f and a positive prediction value of %f.", sens, spec, neg_pred_val, pos_pred_val)
+
+```
+```{r}
+sum(t)
+```
+
+
+

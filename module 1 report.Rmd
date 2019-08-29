@@ -1,0 +1,424 @@
+---
+title: "Module 1 Report"
+author: '440455558'
+date: "29/08/2019"
+output: 
+  html_document:
+    toc: true
+    theme: united
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Executive Summary
+
+# Data Story & Initial Analysis
+
+```{r data_init, echo=FALSE, results='hide', message=FALSE}
+library(tidyverse)
+library(janitor)
+library(reshape2)
+colsUsed = c("Year", "Region", "Gender", "Age", "Country", "New Zealand European", "Maori", "Samoan", "Cook Islands Maori", "Tongan", "Niuean", "Chinese", "Indian", "Other ethnicity", "Languages spoken", "Travel method to school", "Favourite video game", "Handedness", "Own cell phone", "Check messages as soon as you wake up", "Respond to messages immediately", "Feeling without phone - Anxious", "Climate change opinion")
+colIdx = c(1:15, 17, 22, 36, 37,44,45, 49, 64)
+c_types = cols(
+  Year = col_factor(levels = c(4:13), ordered = TRUE),
+  Region = "f",
+  Gender = "f",
+  Age = col_factor(levels = c(6:19), ordered = TRUE),                     
+  "Country" = "f",     
+  "New Zealand European" = "f",                                                         
+  "Maori" = "f",                                                                 
+  "Samoan" = "f",                                                                 
+  "Cook Islands Maori" = "f",                                                           
+  "Tongan" = "f",                                                                 
+  "Niuean" = "f",                                                                 
+  "Chinese" = "f",                                                                 
+  "Indian" = "f",                                                                 
+  "Other ethnicity" = "f",
+  "Languages spoken" = col_factor(levels = c(1:5), ordered = TRUE),
+  "Eye Colour" = "f",                                                                 
+  "Handedness" = "f",                                                                 
+  "Height" = "_",                                                                 
+  "Right foot length" = "_",
+  "Wrist circumference" = "_",
+  "Left thumb circumference" = "_",
+  "Travel method to school" = "f",                                                  
+  "Travel time to school" = "_",                                                  
+  "Bag weight" = "_",                                                  
+  "Litter in lunch" = "_",                                                  
+  "Fruit/vegetables in lunch" = "_",                                                  
+  "Memory time" = "_",                                                  
+  "Reaction time" = "_",                                                  
+  "Time standing on left leg" = "_",                                                  
+  "Physical activity - before school" = "_",
+  "Physical activity - at school" = "_",
+  "Physical activity - after school" = "_",
+  "Physical activity - on the weekend" = "_",
+  "Scheduled activities in last week" = "_",
+  "Screen time after school" = "_",                                                  
+  "Favourite video game" = "f",                                                  
+  "Own cell phone" = "f",                                                  
+  "Facebook account" = "_",                                                  
+  "Instagram account" = "_",                                                  
+  "Snapchat account" = "_",                                                  
+  "Reddit account" = "_",                                                  
+  "YouTube channel" = "_",                                                  
+  "Technology - None of these" = "_",                                                  
+  "Check messages as soon as you wake up" = "f", 
+  "Respond to messages immediately" = "f",                                              
+  "Take phone to school" = "_",                                                  
+  "Lose focus as school due to phone" = "_",
+  "Feeling without phone - Angry" = "_",                                                
+  "Feeling without phone - Anxious" = "f",
+  "Feeling without phone - Frustrated" = "_",
+  "Feeling without phone - Happy" = "_",
+  "Feeling without phone - Lonely" = "_",
+  "Feeling without phone - Relieved" = "_",
+  "Feeling without phone - Sad" = "_",                                                  
+  "Feeling without phone - Neutral" = "_",
+  "Screen time opinion - On your phone" = "_",
+  "Screen time opinion - On social media" = "_",
+  "Screen time opinion - Playing video games" = "_",
+  "Bed time" = "_",
+  "Wake time" = "_",
+  "Sleep time" = "_",
+  "Time you get home from school" = "_",
+  "Time you ate dinner" = "_",
+  "Climate change opinion" = "f",
+  "How true: I get carried away by my feelings" = "_",
+  "How true: I say the first thing that comes into my mind without thinking enough about it" = "_",
+  "How true: I can't stop myself from doing something, even if I know it is wrong" = "_",
+  "How true: I try to talk out a problem instead of fighting" = "_",
+  "How true: It is easy for me to make friends" = "_",
+  "How true: I know how to stand up for myself without being mean" = "_",
+  "How wrong - Drink alcohol" = "_",
+  "How wrong - Smoke tobacco cigarettes" = "_",
+  "How wrong - Smoke e-cigarettes" = "_",
+  "How wrong - Smoke marijuana" = "_",
+  "How wrong (caregivers/parents) - Drink alcohol" = "_",
+  "How wrong (caregivers/parents) - Smoke tobacco cigarettes" = "_",
+  "How wrong (caregivers/parents) - Smoke e-cigarettes" = "_",
+  "How wrong (caregivers/parents) - Smoke marijuana" = "_"
+)
+data = readr::read_csv("sampler-15d6355b54423c.csv", col_types = c_types)
+```
+```{r}
+print(colSums(is.na(data)))
+
+```
+The data has been read in with only the necessary columns. All columns are categorical and therefore parsed in as factor datatypes. There are still 198 NA values that need to be cleaned. We can also have a look at the distribution of the data points.
+
+The NA values need to be carefully handled to ensure the data is not skewed.
+The Age will be the mean of ages to the closest int.
+Country will be "Other"
+We can see that other ethnicity hasn't have a "None" option, so we are making the assumption that NA means they have no other ethnicity. We will therefore classify these as None.  
+There are 6 missing values for languages and no students don't speak a language. It is possible that these students are mute, or that they missed the question. This dataframe will make these responses 0 and account for it during research.  
+There is only 1 missing value in handedness which we can just eliminate, or we can take the mode, which is obviously the right hand and assign that value. For rigor, we calculate mode and them allocate it.  
+For travel to school, we can see that there is an "other" column implying the data was corrupted or not filled in. There is a possibility that the data was also left blank as the student was homeschooled, however that could still be classified as other. Because we can't be certain, we will take the mode.   
+Given there is an option for "Don't Have One" and the input looks like it could have been unstructured, it seems that the data might have been corrupt. To avoid effecting the outcomes, I will add another level with "No Response" which can be accounted for in the future.
+For own cell phone, check messages as soon as you wake up, respond immediated and feeling without phone - Anxious, the values will not be taken into account.
+
+
+
+```{r clean_data}
+#Convert missing ages to average
+avg_age <- round(mean(as.numeric(data$Age), na.rm=TRUE))
+data$Age[is.na(data$Age) == TRUE] <- avg_age
+#Convert Country to "Other"
+levels(data$Country) <- c(levels(data$Country), "Other")
+data$Country[is.na(data$Country) == TRUE] = "Other"
+#Changing NA values to "None"
+levels(data$`Other ethnicity`) <- c(levels(data$`Other ethnicity`), "None")
+data$`Other ethnicity`[is.na(data$`Other ethnicity`) == TRUE] <- "None"
+#languages spoken
+levels(data$`Languages spoken`) <- c(levels(data$`Languages spoken`), 0)
+data$`Languages spoken`[is.na(data$`Languages spoken`)==TRUE] <- 0
+#Handedness
+uniquev <- unique(data$Handedness)
+modeVal <- uniquev[which.max(tabulate(match(data$Handedness, uniquev)))]
+data$Handedness[is.na(data$Handedness) == TRUE] <- modeVal
+#Travel to school
+d <- data$`Travel method to school`
+u <- unique(d)
+m <- u[which.max(tabulate(match(d,u)))]
+data$`Travel method to school`[is.na(data$`Travel method to school`) == TRUE] <- m
+#favourite video game
+levels(data$`Favourite video game`) <- c(levels(data$`Favourite video game`), "No Response")
+data$`Favourite video game`[is.na(data$`Favourite video game`) == TRUE] <- "No Response" 
+```
+```{r}
+table(data$`Climate change opinion`)
+```
+
+```{r}
+```
+
+## Who collects this data and how is it reported?
+The NZ School census data a voluntary initiative driven by CensusAtSchool NZ. They are a non-profit and educationally motivated project that are hosted by the New Zealand Department of Statistics in association with Stats NZ and the Ministry of Education.
+The data is open-sourced on their website https://new.censusatschool.org.nz/about/, and includes a to to explore and visualise the data.
+
+## How are missing values recorded, and why might they occur? In the analysis below you will need to think about how to handle missing values.
+The missing values are recorded as NA.
+TODO:
+  - Define each used column
+  - Note the type of data (categorical, nominal etc)
+  - For categorical, denote the types and any erronious values, for continuous, note any outliers
+  - Clean the missing values by either distributing them according to their distribution, by the mean, or remove them all together.
+
+```{r col_details}
+dplyr::glimpse(data)
+```
+```{r colnames}
+colnames(data)
+
+
+```
+
+## Provide some general demographic information about your sample. {.tabset}
+### School Year
+The students are from year 5 to year 13.
+
+### Region
+```{r demo_data}
+demo_data <- data[,c("Year", "Region", "Gender", "Age", "Country", "New Zealand European", "Maori", "Samoan", "Cook Islands Maori", "Tongan", "Niuean", "Chinese", "Indian", "Other ethnicity", "Languages spoken")]
+ggplot(demo_data, aes(Region)) +
+geom_bar(fill="orange") + theme(axis.text.x = element_text(angle=60, hjust=1))
+```
+
+
+### Gender
+```{r}
+ggplot(demo_data, aes(Gender)) + 
+  geom_bar(aes(y=(..count..)/sum(..count..)), fill="forest green") +
+          scale_y_continuous(labels=scales::percent) +
+  ylab("relative frequencies")
+
+```
+
+
+### Age
+```{r}
+ggplot(demo_data, aes(Age)) + 
+  geom_bar(fill="brown")
+```
+
+
+### Distribution of Language
+```{r}
+ggplot(demo_data, aes(Country)) + 
+  geom_bar(aes(y=(..count..)/sum(..count..)), fill="maroon") +
+  theme(axis.text.x = element_text(angle=60, hjust=1)) +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("relative frequencies")
+
+```
+
+### Number of Languages Spoken
+```{r}
+lang_freq <- as.data.frame((table(demo_data$`Languages spoken`)))
+colnames(lang_freq) <- c("n_languages", "freq")
+
+ggplot(lang_freq, aes(n_languages)) + 
+  geom_bar(stat="identity", aes(y=freq/sum(freq)), fill="maroon") + 
+  ylab("Number of Students (%)")
+```
+```{r}
+bg <- demo_data[,6:14]
+bg$`Other ethnicity`[!is.na(bg$`Other ethnicity`)] <- "yes" 
+bg$`Other ethnicity`[is.na(bg$`Other ethnicity`)] <- "no" 
+
+```
+
+```{r clean_languages}
+res <- data.frame(colnames(bg), colSums(bg == 'no'), colSums(bg == "yes"), row.names=c(1:length(bg)))
+colnames(res) <- c("ethnicity", "no", "yes")
+attach(res)
+res <-res[order(res$yes), ]
+detach(res)
+res
+```
+
+### Distribution of Language
+```{r}
+# resLong <- melt(res, id=c("ethnicity"))
+# ggplot(resLong) +
+#   geom_bar(aes(x = ethnicity, y = value, fill = variable), 
+#            stat="identity", position = "dodge", width = 0.7) +
+#   scale_fill_manual("Result\n", values = c("orange","forest green"), 
+#                     labels = c(" no", " yes")) +
+#   labs(x="\nNumber",y="Result\n") +
+#   coord_flip() +
+#   theme_bw(base_size = 14) + 
+#   theme(axis.text.x = element_text(angle=60, hjust=1))
+ggplot() + geom_col(data=res, aes(x=fct_infreq(factor(yes)), y=yes), fill="orange") + coord_flip() + 
+    theme(axis.text.x = element_text(angle=60, hjust=1))
+```
+```{r map_plot}
+# head(demo_data[,6:14])
+# #Using GGPLOT, plot the Base World Map
+# mp <- NULL
+# mapWorld <- borders("world", colour="gray50", fill="gray50") # create a layer of borders
+# mp <- ggplot() +   mapWorld
+# 
+# #Now Layer the cities on top
+# mp <- mp+ geom_point(aes(x=demo_data, y=visit.y) ,color="blue", size=3) 
+# mp
+```
+```{r}
+# ggplot(demo_data, aes(x=)) +
+# geom_bar(stat="identity", position="fill") +
+# geom_text(stat='count', aes(label=..count..), vjust=-1) + 
+# theme(axis.text.x = element_text(angle=60, hjust=1))
+
+```
+
+
+
+## What is the most common method of travel to school?
+
+```{r travel_method}
+x = data$`Travel method to school`
+y = table(x)
+```
+
+As you can see by the above graph, the most common travel method for students is ____.
+
+**If I have time I can break this down by year and stack the plot accordingly.
+
+
+## What are the most common favourite video games? You may want to use forcats::fct_lump() to group the least common games together.
+```{r}
+x = data$`Favourite video game`
+y = table(x)
+
+```
+As you can see by the above graph, the most common favourite video game is _____
+
+
+# Research Questions
+
+## It is hypothesised that 90% of the population are right handed. Does your sample of data support this hypothesis? 
+**HINT**You may need to recode the data so that there are only two categories.
+**Hypothesis:**
+$H_0$: 90% of the population are right-handed.
+$H_1$: 90% of the population are **not** right-handed.
+**Assumptions:**
+We assume this sample is randomly selected. We use a  p-value of .05
+
+**Test Statistic:**
+The data is a binomial distribution.
+
+**p-value:**
+```{r}
+x = data$Handedness
+
+```
+**confidence interval**
+odds ratio end of lec08
+
+### Is handedness independent of gender?
+
+We want to test for homogeneity, so lets make a 2x2, two-way contingency table.
+
+**Hypothesis:**
+$H_0$: There is no difference between the number of right and left-handed males and females. so the $e_{ij}=n_i\hat{p}_{ij} = y_i* \dfrac{y_j}{n}$
+$H_1$: There is a difference between the number of right and left-handed males and females.
+
+**Assumptions:**
+We assume this sample is randomly selected. We use a  p-value of .05
+
+**Test Statistic:**
+The data is a binomial distribution.
+$T = \sum_{i=2}^2\sum_{j=1}^2\dfrac{(Y_{ij} - e_{ij})^2}{e_{ij}} \sim \chi^2_{(1)(1)} $
+**p-value:**
+
+```{r handedness_confounder}
+#Create a table with columns being left and right handed
+#The rows are male and female
+#Run chisquared test (End of lecture 07)
+
+```
+
+
+## What proportion of students own a cell phone? Is this proportion constant across the different year groups? Perform a test to see if there is a statistically significant difference in cell phone ownership across year groups.
+
+```{r prop_phones}
+prop_phones = length(which(data$`Own cell phone` == 'yes'))/length(data$`Own cell phone`)
+```
+The proportion of students that own cell phones is "r prop_phones" percent.
+
+**Hypothesis:**
+$H_0$: The proportion of students that own a cell phone. 
+$H_1$: 90% of the population are **not** right-handed.
+**Assumptions:**
+We assume this sample is randomly selected. We use a  p-value of .05
+
+**Test Statistic:**
+
+**p-value:**
+
+```{r constant_prop}
+# Group by year groups and count the number of cell phones in each year group.
+# prop_across_years = data[data$`Own cell phone`==TRUE]
+
+# Create a table then run a chisquared test.
+
+```
+## Restricting attention to students in years 7 to 12 who own a cell phone, is there an association between the tendency to check messages as soon as they wake up and feeling anxious when they’re without their phone. Do you get the same answer if you use a Monte Carlo p-value calculation? You may want to collapse some categories together, using forcats::fct_collapse().
+
+**Hypothesis:**
+$H_0$: There is no association between students year 7-12 tendency to check messages as soon as they wake up, and feeling anxious when they're without their phone.
+$H_1$: There is an association between students year 7-12 tendency to check messages as soon as they wake up, and feeling anxious when they're without their phone.
+**Assumptions:**
+We assume this sample is randomly selected. We use a  p-value of .05
+
+**Test Statistic:**
+
+**p-value:**
+
+
+```{r}
+seven_to_twelve = dplyr::filter(data, Year >= 7, Year <= 12, `Own cell phone` == TRUE)
+
+#group by those who check messages and those who don't
+#subgroup by those who feel anxious and those who dont
+#plot it to see if there is any visual suggestion
+#run test on it
+#run monte carlo pval 
+
+
+```
+
+## What other questions could you ask of this data? Pick one and perform an appropriate test.
+TODO:
+  - List 3 possible questions. Choose one that uses something that uses a chisquared test.
+
+## Are there any limitations of this data set?
+ - The size of the sample,
+ - Representation of the population
+ - Survey based responses
+ - Lots of questions could lead to survey fatigue
+ - Look up first couple of Lectures.
+
+# conclusion
+
+# References
+Wild, C. and Cunliffe, R. (2019). About - CensusAtSchool New Zealand. [online] CensusAtSchool New Zealand. Available at: https://new.censusatschool.org.nz/about/ [Accessed 26 Aug. 2019].
+https://pages.github.sydney.edu.au/DATA2002/2019/m1_report.html
+https://www.earthdatascience.org/courses/earth-analytics/multispectral-remote-sensing-modis/add-variables-to-rmarkdown-report/
+Yihui Xie_ J.J. Allaire_ Garrett Grolemund - R Markdown_ The Definitive Guide-CRC Press (2018)
+https://www.overleaf.com/learn/latex/Integrals,_sums_and_limits
+Labs and Lectures
+
+
+
+
+
+
+
+
+
