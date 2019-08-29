@@ -1,8 +1,0 @@
----
-title: "Module 1 Report"
-author: "440455558"
-output: 
-  html_notebook:
-    code_folding: hide
----
-
