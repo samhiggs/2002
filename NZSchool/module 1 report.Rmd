@@ -22,6 +22,9 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(janitor)
 library(reshape2)
+library(plyr)
+library(lemon)
+knit_print.data.frame <- lemon_print
 colsUsed = c("Year", "Region", "Gender", "Age", "Country", "New Zealand European", "Maori", "Samoan", "Cook Islands Maori", "Tongan", "Niuean", "Chinese", "Indian", "Other ethnicity", "Languages spoken", "Travel method to school", "Favourite video game", "Handedness", "Own cell phone", "Check messages as soon as you wake up", "Respond to messages immediately", "Feeling without phone - Anxious", "Climate change opinion")
 colIdx = c(1:15, 17, 22, 36, 37,44,45, 49, 64)
 c_types = cols(
@@ -106,11 +109,8 @@ c_types = cols(
 )
 data = readr::read_csv("sampler-15d6355b54423c.csv", col_types = c_types)
 ```
-```{r}
-print(colSums(is.na(data)))
 
-```
-The data has been read in with only the necessary columns. All columns are categorical and therefore parsed in as factor datatypes. There are still 198 NA values that need to be cleaned. We can also have a look at the distribution of the data points.
+The data has been read in with only the necessary columns. All columns we used are categorical and therefore parsed in as factor datatypes. There are still 198 NA values that need to be cleaned. We can also have a look at the distribution of the data points.
 
 The NA values need to be carefully handled to ensure the data is not skewed.
 The Age will be the mean of ages to the closest int.
@@ -122,9 +122,20 @@ For travel to school, we can see that there is an "other" column implying the da
 Given there is an option for "Don't Have One" and the input looks like it could have been unstructured, it seems that the data might have been corrupt. To avoid effecting the outcomes, I will add another level with "No Response" which can be accounted for in the future.
 For own cell phone, check messages as soon as you wake up, respond immediated and feeling without phone - Anxious, the values will not be taken into account.
 
+## Who collects this data and how is it reported?
+The NZ School census data a voluntary initiative driven by CensusAtSchool NZ. They are a non-profit and educationally motivated project that are hosted by the New Zealand Department of Statistics in association with Stats NZ and the Ministry of Education.
+The data is open-sourced on their website https://new.censusatschool.org.nz/about/, and includes a to to explore and visualise the data.
 
-
+## How are missing values recorded, and why might they occur? In the analysis below you will need to think about how to handle missing values.
+The missing values are recorded as NA.
+TODO:
+  - Define each used column
+  - Note the type of data (categorical, nominal etc)
+  - For categorical, denote the types and any erronious values, for continuous, note any outliers
+  - Clean the missing values by either distributing them according to their distribution, by the mean, or remove them all together.
+  
 ```{r clean_data}
+# colSums(is.na(data))
 #Convert missing ages to average
 avg_age <- round(mean(as.numeric(data$Age), na.rm=TRUE))
 data$Age[is.na(data$Age) == TRUE] <- avg_age
@@ -149,53 +160,51 @@ data$`Travel method to school`[is.na(data$`Travel method to school`) == TRUE] <-
 #favourite video game
 levels(data$`Favourite video game`) <- c(levels(data$`Favourite video game`), "No Response")
 data$`Favourite video game`[is.na(data$`Favourite video game`) == TRUE] <- "No Response" 
-```
-```{r}
-table(data$`Climate change opinion`)
-```
+#Responds to messages immediately
+data$`Respond to messages immediately`[is.na(data$`Respond to messages immediately`)==TRUE] <- "n/a"
+#Feeling anxious wout phone
+data$`Feeling without phone - Anxious`[is.na(data$`Feeling without phone - Anxious`)==TRUE] <- "no"
+#Climate change
+levels(data$`Climate change opinion`) <- c(levels(data$`Climate change opinion`), "No Response")
+data$`Climate change opinion`[is.na(data$`Climate change opinion`) == TRUE] <- "No Response"
 
-```{r}
 ```
-
-## Who collects this data and how is it reported?
-The NZ School census data a voluntary initiative driven by CensusAtSchool NZ. They are a non-profit and educationally motivated project that are hosted by the New Zealand Department of Statistics in association with Stats NZ and the Ministry of Education.
-The data is open-sourced on their website https://new.censusatschool.org.nz/about/, and includes a to to explore and visualise the data.
-
-## How are missing values recorded, and why might they occur? In the analysis below you will need to think about how to handle missing values.
-The missing values are recorded as NA.
-TODO:
-  - Define each used column
-  - Note the type of data (categorical, nominal etc)
-  - For categorical, denote the types and any erronious values, for continuous, note any outliers
-  - Clean the missing values by either distributing them according to their distribution, by the mean, or remove them all together.
 
 ```{r col_details}
-dplyr::glimpse(data)
+# dplyr::glimpse(data)
 ```
 ```{r colnames}
-colnames(data)
-
+# colnames(data)
 
 ```
 
 ## Provide some general demographic information about your sample. {.tabset}
+
+```{r demo_subset}
+demo_data <- data[,c("Year", "Region", "Gender", "Age", "Country", "New Zealand European", "Maori", "Samoan", "Cook Islands Maori", "Tongan", "Niuean", "Chinese", "Indian", "Other ethnicity", "Languages spoken")]
+```
 ### School Year
-The students are from year 5 to year 13.
+```{r school_year}
+ggplot(demo_data, aes(Year)) + geom_bar(fill="maroon")
+```
+We can see from the above graph that there is an equal number of students in each year ranging from year 4 to 13 as per the specifications for this report.  
 
 ### Region
-```{r demo_data}
-demo_data <- data[,c("Year", "Region", "Gender", "Age", "Country", "New Zealand European", "Maori", "Samoan", "Cook Islands Maori", "Tongan", "Niuean", "Chinese", "Indian", "Other ethnicity", "Languages spoken")]
-ggplot(demo_data, aes(Region)) +
-geom_bar(fill="orange") + theme(axis.text.x = element_text(angle=60, hjust=1))
+```{r}
+ggplot(demo_data) +
+  geom_bar(aes(x=fct_rev(fct_infreq(Region)), y = (..count..)/sum(..count..)), fill="orange") + 
+  scale_y_continuous(labels=scales::percent) + coord_flip() + 
+  labs(title = "Region where sample are from", x = "Region", y="Percent")
 ```
+As we can see by the above graph, the highest percentage of respondents come from Aukland, then Canterbury (part of Christchurch), then Wellington. As more than half of our sample population comes from major cities, this report will be cautious in reporting on findings that may be confounded by rural participants.
 
 
 ### Gender
 ```{r}
 ggplot(demo_data, aes(Gender)) + 
   geom_bar(aes(y=(..count..)/sum(..count..)), fill="forest green") +
-          scale_y_continuous(labels=scales::percent) +
-  ylab("relative frequencies")
+    scale_y_continuous(labels=scales::percent) +
+    labs(title="Male vs Female Distribution", x="Gender", y="Percent")
 
 ```
 
@@ -206,14 +215,26 @@ ggplot(demo_data, aes(Age)) +
   geom_bar(fill="brown")
 ```
 
+We can see that many of our respondents lie between the age of 8 and 17...
 
-### Distribution of Language
+### Nationality
 ```{r}
-ggplot(demo_data, aes(Country)) + 
+
+nationality <- as.data.frame((table(demo_data$Country == "New Zealand")))
+colnames(nationality) <- c("is_NZ", "freq")
+nationality$freq <- nationality$freq/sum(nationality$freq)
+ggplot(nationality, aes(x=is_NZ, y=freq)) + 
+  geom_bar(stat="identity", fill="maroon") + 
+  scale_y_continuous(labels= scales::percent) +
+  labs(title="Proportion of NZ Respondents", x="Is From New Zealand", y="Percent")
+```
+```{r}
+other_c <- subset(demo_data, Country != "New Zealand")
+ggplot(other_c, aes(fct_infreq(Country))) + 
   geom_bar(aes(y=(..count..)/sum(..count..)), fill="maroon") +
   theme(axis.text.x = element_text(angle=60, hjust=1)) +
   scale_y_continuous(labels=scales::percent) +
-  ylab("relative frequencies")
+  labs(title="Non NZ Citizenships", x="Citizenship",   y="Percentage")
 
 ```
 
@@ -226,78 +247,53 @@ ggplot(lang_freq, aes(n_languages)) +
   geom_bar(stat="identity", aes(y=freq/sum(freq)), fill="maroon") + 
   ylab("Number of Students (%)")
 ```
-```{r}
+
+```{r clean_languages}
 bg <- demo_data[,6:14]
 bg$`Other ethnicity`[!is.na(bg$`Other ethnicity`)] <- "yes" 
 bg$`Other ethnicity`[is.na(bg$`Other ethnicity`)] <- "no" 
-
-```
-
-```{r clean_languages}
 res <- data.frame(colnames(bg), colSums(bg == 'no'), colSums(bg == "yes"), row.names=c(1:length(bg)))
 colnames(res) <- c("ethnicity", "no", "yes")
-attach(res)
-res <-res[order(res$yes), ]
-detach(res)
-res
 ```
 
-### Distribution of Language
+### Ethnicity
 ```{r}
-# resLong <- melt(res, id=c("ethnicity"))
-# ggplot(resLong) +
-#   geom_bar(aes(x = ethnicity, y = value, fill = variable), 
-#            stat="identity", position = "dodge", width = 0.7) +
-#   scale_fill_manual("Result\n", values = c("orange","forest green"), 
-#                     labels = c(" no", " yes")) +
-#   labs(x="\nNumber",y="Result\n") +
-#   coord_flip() +
-#   theme_bw(base_size = 14) + 
-#   theme(axis.text.x = element_text(angle=60, hjust=1))
-ggplot() + geom_col(data=res, aes(x=fct_infreq(factor(yes)), y=yes), fill="orange") + coord_flip() + 
-    theme(axis.text.x = element_text(angle=60, hjust=1))
+ggplot(res, aes(x=reorder(ethnicity, -yes), y = yes)) + 
+  geom_bar(stat="identity", fill="steelblue") +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
+  labs(title="Non NZ Citizenships", x="Citizenship",   y="Percentage")
 ```
-```{r map_plot}
-# head(demo_data[,6:14])
-# #Using GGPLOT, plot the Base World Map
-# mp <- NULL
-# mapWorld <- borders("world", colour="gray50", fill="gray50") # create a layer of borders
-# mp <- ggplot() +   mapWorld
-# 
-# #Now Layer the cities on top
-# mp <- mp+ geom_point(aes(x=demo_data, y=visit.y) ,color="blue", size=3) 
-# mp
-```
-```{r}
-# ggplot(demo_data, aes(x=)) +
-# geom_bar(stat="identity", position="fill") +
-# geom_text(stat='count', aes(label=..count..), vjust=-1) + 
-# theme(axis.text.x = element_text(angle=60, hjust=1))
-
-```
-
-
 
 ## What is the most common method of travel to school?
 
-```{r travel_method}
-x = data$`Travel method to school`
-y = table(x)
+```{r travel_method, render=lemon_print}
+tm <- tabyl(data$`Travel method to school`)
+colnames(tm) <- c("Travel Method", "n responses", "Percent")
+as.data.frame(tm)
 ```
 
-As you can see by the above graph, the most common travel method for students is ____.
+As you can see by the above graph, the most common travel method for students is by motorvehicle. It is almost twice as popular as bus.
 
 **If I have time I can break this down by year and stack the plot accordingly.
 
 
-## What are the most common favourite video games? You may want to use forcats::fct_lump() to group the least common games together.
-```{r}
-x = data$`Favourite video game`
-y = table(x)
-
+## What are the most common favourite video games? 
+```{r fv, render=lemon_print}
+# tabyl(fct_lump(data$`Favourite video game`,6))
+dt <- data$`Favourite video game` %>% fct_lump(n=7) %>% fct_infreq() %>% tabyl()
+colnames(dt) <- c("Favourite Video Game","n","Percentage")
+as.data.frame(dt)
 ```
-As you can see by the above graph, the most common favourite video game is _____
-
+```{r fav_vid_games}
+x <- tabyl(data$`Favourite video game`)
+colnames(x) <- c("game", "n", "percent")
+x <- x[order(x$n, decreasing=TRUE),]
+x_more_than_one <- subset(x, n>1)
+x_hasOne <- subset(x, game != "Don't Have One" & game != "No Response")
+total_hasGame = sum(x_hasOne$n)
+x[x$game=="Fortnite",2]/total_hasGame
+```
+As you can see by the above table, 42 percent of respondents reported as not owning a video game. Of the total sample, 9 percent reported their favourite game as Fortnite. When you remove respondents without a favourite or whose response wasn't captured, The game was most popular with 18 percent. 
 
 # Research Questions
 
@@ -413,7 +409,8 @@ https://www.earthdatascience.org/courses/earth-analytics/multispectral-remote-se
 Yihui Xie_ J.J. Allaire_ Garrett Grolemund - R Markdown_ The Definitive Guide-CRC Press (2018)
 https://www.overleaf.com/learn/latex/Integrals,_sums_and_limits
 Labs and Lectures
-
+https://www.google.com/maps/place/Canterbury,+New+Zealand/@-43.4795778,169.5731463,7z/data=!3m1!4b1!4m5!3m4!1s0x6d2dd8337875d903:0x337764303169e281!8m2!3d-43.7542275!4d171.1637245
+https://www.stats.govt.nz/topics/population
 
 
 
